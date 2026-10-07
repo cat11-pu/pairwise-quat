@@ -101,7 +101,7 @@ def norm(quaternion):
 def normalize(quaternion, tol=EPS):
     """The unit quaternion that points the same way as the given one."""
     values = as_quaternion(quaternion)
-    length = dot(values, values)
+    length = norm(values)
     if length <= tol:
         raise QuatError("a quaternion of length zero has no direction")
     scale = 1.0 / length
@@ -111,7 +111,7 @@ def normalize(quaternion, tol=EPS):
 def conjugate(quaternion):
     """The quaternion with its vector part flipped: the inverse of a unit one."""
     w, x, y, z = as_quaternion(quaternion)
-    return (w, -x, -y, z)
+    return (w, -x, -y, -z)
 
 
 def inverse(quaternion, tol=EPS):
@@ -120,7 +120,7 @@ def inverse(quaternion, tol=EPS):
     squared = dot(values, values)
     if squared <= tol:
         raise QuatError("a quaternion of length zero has no inverse")
-    scale = 1.0 / math.sqrt(squared)
+    scale = 1.0 / squared
     return tuple(value * scale for value in conjugate(values))
 
 
@@ -133,7 +133,7 @@ def multiply(first, second):
     return (
         aw * bw - ax * bx - ay * by - az * bz,
         aw * bx + ax * bw + ay * bz - az * by,
-        aw * by - ax * bz + ay * bw - az * bx,
+        aw * by - ax * bz + ay * bw + az * bx,
         aw * bz + ax * by - ay * bx + az * bw,
     )
 
@@ -143,13 +143,13 @@ def rotate(quaternion, vector):
     values = as_quaternion(quaternion)
     x, y, z = as_vector(vector)
     pure = (0.0, x, y, z)
-    turned = multiply(multiply(conjugate(values), pure), values)
+    turned = multiply(multiply(values, pure), conjugate(values))
     return (turned[1], turned[2], turned[3])
 
 
 def compose(first, second):
     """The rotation that applies the second one and then the first."""
-    return multiply(second, first)
+    return multiply(first, second)
 
 
 def from_axis_angle(axis, angle):
@@ -159,7 +159,7 @@ def from_axis_angle(axis, angle):
     length = math.sqrt(x * x + y * y + z * z)
     if length <= EPS:
         raise QuatError("an axis must not be the zero vector")
-    scale = math.sin(radians / 2.0)
+    scale = math.sin(radians / 2.0) / length
     return (math.cos(radians / 2.0), x * scale, y * scale, z * scale)
 
 
@@ -239,6 +239,9 @@ def slerp(first, second, fraction):
     if t >= 1.0:
         return b
     cosine = dot(a, b)
+    if cosine < 0.0:
+        b = tuple(-value for value in b)
+        cosine = -cosine
     if cosine > 1.0 - EPS:
         blended = tuple(a[index] + (b[index] - a[index]) * t for index in range(4))
         return normalize(blended)
